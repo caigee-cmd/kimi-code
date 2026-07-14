@@ -923,33 +923,31 @@ describe('OpenAILegacyChatProvider', () => {
       },
     );
 
-    it('.withThinking("max") maps to xhigh without model-specific clamping', async () => {
+    it('.withThinking("max") passes max through verbatim across models', async () => {
+      // OpenAI documents `max` as a distinct reasoning effort (GPT-5.6), so a
+      // caller who selects `max` must send `max` on the wire — not a silent
+      // downgrade to `xhigh`. The mapper is model-agnostic, so all models
+      // receive the same passthrough. See issue #1639.
       const history: Message[] = [
         { role: 'user', content: [{ type: 'text', text: 'Think' }], toolCalls: [] },
       ];
 
-      const openAIChatModel = await captureRequestBody(
-        createProvider({ model: 'gpt-5.5' }).withThinking('max'),
-        '',
-        [],
-        history,
-      );
-      const openAIProModel = await captureRequestBody(
-        createProvider({ model: 'gpt-5.5-pro' }).withThinking('max'),
-        '',
-        [],
-        history,
-      );
-      const deepSeekModel = await captureRequestBody(
-        createProvider({ model: 'deepseek/deepseek-v4-pro' }).withThinking('max'),
-        '',
-        [],
-        history,
-      );
+      const openAIChatProvider = createProvider({ model: 'gpt-5.5' }).withThinking('max');
+      const openAIProProvider = createProvider({ model: 'gpt-5.5-pro' }).withThinking('max');
+      const deepSeekProvider = createProvider({
+        model: 'deepseek/deepseek-v4-pro',
+      }).withThinking('max');
 
-      expect(openAIChatModel['reasoning_effort']).toBe('xhigh');
-      expect(openAIProModel['reasoning_effort']).toBe('xhigh');
-      expect(deepSeekModel['reasoning_effort']).toBe('xhigh');
+      const openAIChatModel = await captureRequestBody(openAIChatProvider, '', [], history);
+      const openAIProModel = await captureRequestBody(openAIProProvider, '', [], history);
+      const deepSeekModel = await captureRequestBody(deepSeekProvider, '', [], history);
+
+      expect(openAIChatModel['reasoning_effort']).toBe('max');
+      expect(openAIProModel['reasoning_effort']).toBe('max');
+      expect(deepSeekModel['reasoning_effort']).toBe('max');
+      // Round-trip: the stored effort reads back as `max`, not `xhigh`.
+      expect(openAIChatProvider.thinkingEffort).toBe('max');
+      expect(deepSeekProvider.thinkingEffort).toBe('max');
     });
   });
 

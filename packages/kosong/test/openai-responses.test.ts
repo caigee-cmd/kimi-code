@@ -1041,9 +1041,10 @@ describe('OpenAIResponsesChatProvider', () => {
       expect(body['reasoning']).toEqual({ effort: 'xhigh', summary: 'auto' });
     });
 
-    it('with_thinking("max") on gpt-5.1-codex-max clamps up to xhigh on the wire', async () => {
-      // Regression guard: "max" used to fall back to "high"; for OpenAI it
-      // must clamp up to their highest supported effort, xhigh.
+    it('with_thinking("max") on gpt-5.1-codex-max passes max through to the wire', async () => {
+      // OpenAI now documents `max` as a distinct reasoning effort (GPT-5.6).
+      // A model that advertises `max` in its support_efforts must receive
+      // `max` on the wire, not a silent downgrade to `xhigh`. See issue #1639.
       const provider = new OpenAIResponsesChatProvider({
         model: 'gpt-5.1-codex-max',
         apiKey: 'test-key',
@@ -1053,7 +1054,9 @@ describe('OpenAIResponsesChatProvider', () => {
       ];
       const body = await captureRequestBody(provider, '', [], history);
 
-      expect((body['reasoning'] as Record<string, unknown>)['effort']).toBe('xhigh');
+      expect(body['reasoning']).toEqual({ effort: 'max', summary: 'auto' });
+      // Round-trip: the stored effort reads back as `max`, not `xhigh`.
+      expect(provider.thinkingEffort).toBe('max');
     });
   });
 

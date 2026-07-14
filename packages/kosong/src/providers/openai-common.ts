@@ -165,12 +165,21 @@ export function thinkingEffortToReasoningEffort(effort: ThinkingEffort): string 
     case 'high':
       return 'high';
     case 'xhigh':
-    case 'max':
       return 'xhigh';
+    case 'max':
+      // Pass through verbatim. OpenAI now documents `max` as a distinct
+      // reasoning effort (GPT-5.6), so a model that advertises `max` in
+      // its `support_efforts` must receive `max`, not a silent downgrade
+      // to `xhigh`. See issue #1639.
+      return 'max';
+    case 'on':
+      // 'on' (boolean models): send no reasoning_effort and let the model
+      // use its own default.
+      return undefined;
     default:
-      // 'on' (boolean models) or any model-declared effort OpenAI does not
-      // recognize: send no reasoning_effort and let the model use its own
-      // default, rather than throwing on a value the model itself advertised.
+      // Any model-declared effort OpenAI does not recognize: send no
+      // reasoning_effort rather than throwing on a value the model itself
+      // advertised.
       return undefined;
   }
 }
@@ -193,8 +202,11 @@ export function reasoningEffortToThinkingEffort(
     case 'high':
       return 'high';
     case 'xhigh':
-    case 'max':
       return 'xhigh';
+    case 'max':
+      // Keep the round-trip with thinkingEffortToReasoningEffort symmetric:
+      // a stored `max` reads back as `max`, not `xhigh`. See issue #1639.
+      return 'max';
     case 'none':
       return 'off';
     default:
